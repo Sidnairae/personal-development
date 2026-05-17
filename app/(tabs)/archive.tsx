@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, BucketColors } from '../../constants/theme';
 import { BucketBadge } from '../../components/BucketBadge';
 import { ContentView } from '../../components/ContentView';
-import { loadArchive, loadWeekDays } from '../../lib/content';
+import { loadArchive, loadWeekDays, loadCurrentWeek } from '../../lib/content';
 import type { Week, DayContent } from '../../constants/types';
 import type { BucketId } from '../../constants/theme';
 
@@ -88,6 +88,7 @@ function DayRow({ day, onPress }: { day: DayContent; onPress: () => void }) {
 
 export default function ArchiveScreen() {
   const [weeks,          setWeeks]          = useState<Week[]>([]);
+  const [currentWeek,    setCurrentWeek]    = useState<Week | null>(null);
   const [loading,        setLoading]        = useState(true);
   const [selectedWeek,   setSelectedWeek]   = useState<Week | null>(null);
   const [weekDays,       setWeekDays]       = useState<DayContent[]>([]);
@@ -95,7 +96,11 @@ export default function ArchiveScreen() {
   const [readDay,        setReadDay]        = useState<DayContent | null>(null);
 
   useEffect(() => {
-    loadArchive().then(w => { setWeeks(w); setLoading(false); });
+    Promise.all([loadArchive(), loadCurrentWeek()]).then(([archive, curr]) => {
+      setWeeks(archive);
+      setCurrentWeek(curr);
+      setLoading(false);
+    });
   }, []);
 
   const openWeek = useCallback(async (week: Week) => {
@@ -128,7 +133,13 @@ export default function ArchiveScreen() {
         <View style={styles.center}>
           <Text style={styles.emptyEmoji}>🗄️</Text>
           <Text style={styles.emptyTitle}>Nothing here yet</Text>
-          <Text style={styles.emptyBody}>Past weeks will appear here once you've completed them.</Text>
+          {currentWeek ? (
+            <Text style={styles.emptyBody}>
+              You're in Week {currentWeek.week_number} — "{currentWeek.is_backup_active ? currentWeek.backup_topic_title : currentWeek.topic_title}". It'll appear here once the week is over.
+            </Text>
+          ) : (
+            <Text style={styles.emptyBody}>Past weeks will appear here once you've completed them.</Text>
+          )}
         </View>
       ) : (
         <FlatList

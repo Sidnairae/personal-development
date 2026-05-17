@@ -162,7 +162,11 @@ export function ContentView({ content, bucketId, isComplete, onComplete, onRefre
             const bg =
               answered && correct   ? '#E8F5E9' :
               answered && isThis    ? '#FDECEA' :
-              Colors.surfaceAlt;
+              Colors.surface;
+            const borderColor =
+              answered && correct   ? '#2E7D32' :
+              answered && isThis    ? '#C62828' :
+              Colors.border;
             const textColor =
               answered && correct   ? '#2E7D32' :
               answered && isThis    ? '#C62828' :
@@ -170,7 +174,7 @@ export function ContentView({ content, bucketId, isComplete, onComplete, onRefre
             return (
               <Pressable
                 key={idx}
-                style={[styles.quizOption, { backgroundColor: bg }]}
+                style={[styles.quizOption, { backgroundColor: bg, borderColor }]}
                 onPress={() => !answered && handleAnswer(idx)}
                 disabled={answered}
               >
@@ -204,6 +208,12 @@ export function ContentView({ content, bucketId, isComplete, onComplete, onRefre
           </Pressable>
         )}
       </View>
+
+      {/* Bottom share */}
+      <Pressable onPress={handleShare} style={styles.bottomShare}>
+        <Ionicons name="share-outline" size={15} color={Colors.textMuted} />
+        <Text style={styles.bottomShareText}>Share this piece</Text>
+      </Pressable>
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -272,11 +282,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
     gap: 8,
   },
   quizOptionText: { ...Typography.body, fontSize: 15, flex: 1 },
 
   completeBtnWrap: { marginTop: 32, alignItems: 'center' },
+  bottomShare: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 20,
+    paddingVertical: 8,
+  },
+  bottomShareText: { ...Typography.caption, color: Colors.textMuted },
   completeBtn: {
     paddingVertical: 15,
     paddingHorizontal: 40,

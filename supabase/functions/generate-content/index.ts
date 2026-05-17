@@ -35,6 +35,20 @@ function getISOWeek(d: Date): { week: number; year: number } {
   return { week, year: date.getUTCFullYear() };
 }
 
+function parseClaudeJSON(raw: string): any {
+  const cleaned = raw.trim()
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/, '');
+  try { return JSON.parse(cleaned); } catch {}
+  const first = cleaned.indexOf('{');
+  const last  = cleaned.lastIndexOf('}');
+  if (first !== -1 && last > first) {
+    try { return JSON.parse(cleaned.slice(first, last + 1)); } catch {}
+  }
+  throw new Error(`JSON parse failed. Claude returned: ${raw.slice(0, 300)}`);
+}
+
 async function claude(prompt: string): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -109,8 +123,7 @@ Respond in this exact JSON format (no markdown fences):
 }`
   );
 
-  const cleaned = raw.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
-  const parsed = JSON.parse(cleaned);
+  const parsed = parseClaudeJSON(raw);
   return { format, ...parsed };
 }
 
