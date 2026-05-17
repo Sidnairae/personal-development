@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Colors, Typography, BucketColors } from '../constants/theme';
+import { Colors, Typography, BucketColors, FORMAT_LABELS } from '../constants/theme';
 import type { DayContent } from '../constants/types';
 import type { BucketId } from '../constants/theme';
 
@@ -25,26 +25,25 @@ export function DayCard({ day, dayNumber, bucketId, isToday, isUnlocked, onPress
       onPress={!locked && onPress ? onPress : undefined}
       style={({ pressed }) => [
         styles.card,
-        isToday && { borderColor: accent, borderWidth: 1.5 },
+        isToday && !complete && { borderColor: accent, borderWidth: 1.5 },
+        complete && styles.cardDone,
         pressed && !locked && { opacity: 0.85 },
       ]}
     >
-      {/* Day label */}
       <View style={styles.header}>
-        <Text style={[styles.dayName, isToday && { color: accent }]}>
+        <Text style={[styles.dayName, isToday && !complete && { color: accent }]}>
           {DAY_NAMES[dayNumber]}
         </Text>
         {complete && <Text style={[styles.check, { color: accent }]}>✓</Text>}
-        {locked   && <Text style={styles.lock}>🔒</Text>}
+        {locked    && <Text style={styles.lock}>🔒</Text>}
       </View>
 
-      {/* Format pill */}
       {day && !locked ? (
         <>
-          <Text style={styles.format} numberOfLines={1}>
-            {day.format.replace('_', ' ')}
+          <Text style={[styles.format, complete && styles.textDone]} numberOfLines={1}>
+            {FORMAT_LABELS[day.format] ?? day.format}
           </Text>
-          <Text style={styles.title} numberOfLines={2}>
+          <Text style={[styles.title, complete && styles.textDone]} numberOfLines={2}>
             {day.title}
           </Text>
         </>
@@ -64,6 +63,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     minHeight: 100,
   },
+  cardDone: {
+    backgroundColor: Colors.surfaceAlt,
+    borderColor: Colors.border,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -82,4 +85,5 @@ const styles = StyleSheet.create({
   },
   title:   { ...Typography.body, color: Colors.text, fontSize: 14, lineHeight: 20 },
   pending: { ...Typography.caption, color: Colors.textMuted, marginTop: 8 },
+  textDone: { color: Colors.textMuted },
 });

@@ -37,7 +37,7 @@ export async function loadCurrentWeek(): Promise<Week | null> {
     .select('*')
     .eq('week_number', week)
     .eq('year', year)
-    .single();
+    .maybeSingle();
   if (error || !data) return null;
   return data as Week;
 }

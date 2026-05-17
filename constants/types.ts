@@ -24,6 +24,18 @@ export interface Week {
   created_at: string;
 }
 
+export interface Quiz {
+  question: string;
+  options: [string, string, string, string];
+  answer: 0 | 1 | 2 | 3;
+}
+
+export interface MediaSuggestion {
+  title: string;
+  channel: string;
+  query: string;
+}
+
 export interface DayContent {
   id: string;
   week_id: string;
@@ -34,6 +46,10 @@ export interface DayContent {
   body: string;
   generated_at: string;
   completed_at: string | null;
+  action: string | null;
+  quiz: Quiz | null;
+  watch: MediaSuggestion | null;
+  listen: { title: string; show: string; query: string } | null;
 }
 
 export interface AppState {

@@ -58,7 +58,7 @@ async function generateContent(
   topicTitle: string,
   dayNumber: number,
   previousTitles: string[],
-): Promise<{ format: string; title: string; body: string }> {
+): Promise<{ format: string; title: string; body: string; action: string; quiz: object; watch: object; listen: object }> {
   const format = FORMATS[Math.floor(Math.random() * FORMATS.length)];
 
   const formatInstructions: Record<string, string> = {
@@ -80,11 +80,37 @@ async function generateContent(
 
 ${formatInstructions[format]}
 
+Also provide:
+- action: One specific, concrete thing to do or observe today that connects this idea to real life. Imperative mood, 1–2 sentences. Make it something a curious 24-year-old could actually do today.
+- quiz: One question testing genuine understanding of the content (not a trick). 4 options, exactly one correct. answer is the 0-based index of the correct option.
+- watch: A real YouTube video or channel that covers this topic well. Use an actual channel name (e.g. Kurzgesagt, Veritasium, 3Blue1Brown, TED, Einzelgänger). The query field should be specific enough to find it in YouTube search.
+- listen: A real podcast episode or show on this topic. Use real show names (e.g. Lex Fridman Podcast, Huberman Lab, Philosophize This!, Hardcore History, Hidden Brain). The query field should work as a Spotify search.
+
 Respond in this exact JSON format (no markdown fences):
-{"title": "Content title (max 10 words)", "body": "Full markdown content here"}`
+{
+  "title": "Content title (max 10 words)",
+  "body": "Full markdown content here",
+  "action": "One concrete thing to do today",
+  "quiz": {
+    "question": "Question about the content?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "answer": 0
+  },
+  "watch": {
+    "title": "Video title or description",
+    "channel": "YouTube channel name",
+    "query": "specific youtube search query"
+  },
+  "listen": {
+    "title": "Episode or show description",
+    "show": "Podcast name",
+    "query": "spotify search query"
+  }
+}`
   );
 
-  const parsed = JSON.parse(raw.trim());
+  const cleaned = raw.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+  const parsed = JSON.parse(cleaned);
   return { format, ...parsed };
 }
 
@@ -132,21 +158,18 @@ Deno.serve(async () => {
 
     const toInsert: any[] = [];
 
-    // Generate main track
-    if (!existing.has(`${tomorrowDay}-false`)) {
-      const content = await generateContent(
-        weekRow.bucket_id, weekRow.topic_title, tomorrowDay, mainPrevTitles
-      );
-      toInsert.push({ week_id: weekRow.id, day_number: tomorrowDay, is_backup: false, ...content });
-    }
+    // Generate main + backup in parallel
+    const [mainContent, backupContent] = await Promise.all([
+      existing.has(`${tomorrowDay}-false`)
+        ? Promise.resolve(null)
+        : generateContent(weekRow.bucket_id, weekRow.topic_title, tomorrowDay, mainPrevTitles),
+      existing.has(`${tomorrowDay}-true`)
+        ? Promise.resolve(null)
+        : generateContent(weekRow.backup_bucket_id, weekRow.backup_topic_title, tomorrowDay, backupPrevTitles),
+    ]);
 
-    // Generate backup track
-    if (!existing.has(`${tomorrowDay}-true`)) {
-      const content = await generateContent(
-        weekRow.backup_bucket_id, weekRow.backup_topic_title, tomorrowDay, backupPrevTitles
-      );
-      toInsert.push({ week_id: weekRow.id, day_number: tomorrowDay, is_backup: true, ...content });
-    }
+    if (mainContent)   toInsert.push({ week_id: weekRow.id, day_number: tomorrowDay, is_backup: false, ...mainContent });
+    if (backupContent) toInsert.push({ week_id: weekRow.id, day_number: tomorrowDay, is_backup: true,  ...backupContent });
 
     if (toInsert.length > 0) {
       await supabase.from('day_content').insert(toInsert);

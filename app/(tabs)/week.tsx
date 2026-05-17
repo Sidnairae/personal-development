@@ -1,26 +1,30 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  Alert, ActivityIndicator, SafeAreaView,
+  Alert, ActivityIndicator, SafeAreaView, Modal, RefreshControl,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Colors, Typography, BucketColors } from '../../constants/theme';
 import { BucketBadge } from '../../components/BucketBadge';
 import { DayCard } from '../../components/DayCard';
+import { ContentView } from '../../components/ContentView';
 import {
-  loadCurrentWeek, loadWeekDays, triggerSkip,
+  loadCurrentWeek, loadWeekDays, triggerSkip, markComplete,
   getWeekDay, isUnlocked,
 } from '../../lib/content';
 import type { Week, DayContent } from '../../constants/types';
 import type { BucketId } from '../../constants/theme';
 
 export default function WeekScreen() {
-  const [week,    setWeek]    = useState<Week | null>(null);
-  const [days,    setDays]    = useState<(DayContent | null)[]>(Array(7).fill(null));
-  const [loading, setLoading] = useState(true);
-  const [skipping, setSkipping] = useState(false);
+  const [week,        setWeek]        = useState<Week | null>(null);
+  const [days,        setDays]        = useState<(DayContent | null)[]>(Array(7).fill(null));
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [skipping,    setSkipping]    = useState(false);
+  const [selectedDay, setSelectedDay] = useState<DayContent | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const w = await loadCurrentWeek();
     setWeek(w);
     if (w) {
@@ -29,10 +33,16 @@ export default function WeekScreen() {
       for (const d of fetched) mapped[d.day_number - 1] = d;
       setDays(mapped);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load(true);
+    setRefreshing(false);
+  }, [load]);
 
   const handleSkip = useCallback(async () => {
     if (!week || week.skip_used) return;
@@ -55,6 +65,16 @@ export default function WeekScreen() {
     );
   }, [week, load]);
 
+  const handleDayComplete = useCallback(async () => {
+    if (!selectedDay) return;
+    await markComplete(selectedDay.id);
+    const completed_at = new Date().toISOString();
+    setSelectedDay(prev => prev ? { ...prev, completed_at } : prev);
+    setDays(prev => prev.map(d => d?.id === selectedDay.id ? { ...d, completed_at } : d));
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setTimeout(() => setSelectedDay(null), 1400);
+  }, [selectedDay]);
+
   const currentDay = getWeekDay(new Date());
   const bucketId   = (week?.is_backup_active ? week.backup_bucket_id : week?.bucket_id) as BucketId | undefined;
   const topicTitle = week ? (week.is_backup_active ? week.backup_topic_title : week.topic_title) : '';
@@ -62,9 +82,11 @@ export default function WeekScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={Colors.textSecondary} />
-      </View>
+      <SafeAreaView style={styles.root}>
+        <View style={styles.center}>
+          <ActivityIndicator color={Colors.textSecondary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -86,6 +108,9 @@ export default function WeekScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.inner}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.textMuted} />
+        }
       >
         {/* Week header */}
         <View style={styles.weekHeader}>
@@ -112,23 +137,6 @@ export default function WeekScreen() {
           </Text>
         </View>
 
-        {/* Day grid */}
-        <View style={styles.grid}>
-          {days.map((day, i) => {
-            const dayNum = i + 1;
-            return (
-              <DayCard
-                key={dayNum}
-                day={day}
-                dayNumber={dayNum}
-                bucketId={bucketId!}
-                isToday={dayNum === currentDay}
-                isUnlocked={isUnlocked(dayNum) && (dayNum === 1 || !!days[i - 1]?.completed_at)}
-              />
-            );
-          })}
-        </View>
-
         {/* Skip button */}
         {!week.skip_used ? (
           <Pressable
@@ -147,8 +155,52 @@ export default function WeekScreen() {
           </View>
         )}
 
+        {/* Day grid */}
+        <View style={styles.grid}>
+          {days.map((day, i) => {
+            const dayNum   = i + 1;
+            const unlocked = isUnlocked(dayNum) && (dayNum === 1 || !!days[i - 1]?.completed_at);
+            return (
+              <DayCard
+                key={dayNum}
+                day={day}
+                dayNumber={dayNum}
+                bucketId={bucketId!}
+                isToday={dayNum === currentDay}
+                isUnlocked={unlocked}
+                onPress={day && unlocked ? () => setSelectedDay(day) : undefined}
+              />
+            );
+          })}
+        </View>
+
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      {/* Day content modal */}
+      <Modal
+        visible={!!selectedDay}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSelectedDay(null)}
+      >
+        <SafeAreaView style={styles.modalRoot}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={() => setSelectedDay(null)} style={styles.closeBtn}>
+              <Text style={styles.closeText}>Done</Text>
+            </Pressable>
+          </View>
+          {selectedDay && bucketId && (
+            <ContentView
+              key={selectedDay.id}
+              content={selectedDay}
+              bucketId={bucketId}
+              isComplete={!!selectedDay.completed_at}
+              onComplete={handleDayComplete}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -196,4 +248,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   skipUsedText: { ...Typography.caption, color: Colors.textMuted },
+
+  modalRoot:   { flex: 1, backgroundColor: Colors.background },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  closeBtn:  { paddingHorizontal: 8, paddingVertical: 4 },
+  closeText: { ...Typography.body, color: Colors.textSecondary, fontWeight: '600' },
 });

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ActivityIndicator, SafeAreaView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Colors, Typography, BucketColors } from '../../constants/theme';
 import { RevealCard } from '../../components/RevealCard';
@@ -22,8 +23,8 @@ export default function TodayScreen() {
   const [screenState, setScreenState] = useState<State>('loading');
   const [showReveal,  setShowReveal]  = useState(false);
 
-  const load = useCallback(async () => {
-    setScreenState('loading');
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setScreenState('loading');
     const w = await loadCurrentWeek();
     if (!w) { setScreenState('no_week'); return; }
     setWeek(w);
@@ -37,17 +38,23 @@ export default function TodayScreen() {
     setContent(c);
 
     // Show reveal card on Monday (day 1) if not already completed
-    const isMonday   = dayNum === 1;
-    const noPrevDone = !c?.completed_at;
-    if (isMonday && noPrevDone) {
-      setShowReveal(true);
-      setScreenState('reveal');
-    } else {
-      setScreenState('content');
+    const isMonday = dayNum === 1;
+    if (isMonday && !c?.completed_at) {
+      const revealKey = `reveal_shown_${w.id}`;
+      const alreadyShown = await AsyncStorage.getItem(revealKey);
+      if (!alreadyShown) {
+        await AsyncStorage.setItem(revealKey, '1');
+        setShowReveal(true);
+        setScreenState('reveal');
+        return;
+      }
     }
+    setScreenState('content');
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleRefresh = useCallback(() => load(true), [load]);
 
   const handleComplete = useCallback(async () => {
     if (!content) return;
@@ -66,9 +73,11 @@ export default function TodayScreen() {
 
   if (screenState === 'loading') {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={Colors.textSecondary} />
-      </View>
+      <SafeAreaView style={styles.root}>
+        <View style={styles.center}>
+          <ActivityIndicator color={Colors.textSecondary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -103,8 +112,13 @@ export default function TodayScreen() {
     <SafeAreaView style={styles.root}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1, gap: 4 }}>
           <Text style={styles.headerLabel}>TODAY</Text>
+          {week && (
+            <Text style={styles.headerTopic} numberOfLines={1}>
+              {week.is_backup_active ? week.backup_topic_title : week.topic_title}
+            </Text>
+          )}
           {bucketId && <BucketBadge bucketId={bucketId} size="sm" />}
         </View>
         <View style={[styles.dot, { backgroundColor: accentColor }]} />
@@ -117,6 +131,7 @@ export default function TodayScreen() {
           bucketId={bucketId!}
           isComplete={!!content.completed_at}
           onComplete={handleComplete}
+          onRefresh={handleRefresh}
         />
       ) : (
         <View style={styles.center}>
@@ -150,7 +165,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  headerLabel: { ...Typography.label, color: Colors.textMuted, marginBottom: 6 },
+  headerLabel: { ...Typography.label, color: Colors.textMuted },
+  headerTopic: { ...Typography.body, color: Colors.text, fontWeight: '600', fontSize: 15 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   emptyEmoji: { fontSize: 40, marginBottom: 16 },
   emptyTitle: { ...Typography.title, color: Colors.text, textAlign: 'center', marginBottom: 8 },

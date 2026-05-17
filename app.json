@@ -13,7 +13,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.sidnairae.nova"
+      "bundleIdentifier": "com.sidnairae.nova",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["youtube", "spotify"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +31,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "iosDisplayInForeground": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
