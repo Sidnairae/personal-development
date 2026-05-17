@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
   Alert, ActivityIndicator, SafeAreaView, Modal, RefreshControl,
@@ -37,6 +38,12 @@ export default function WeekScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const weekMounted = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!weekMounted.current) { weekMounted.current = true; return; }
+    load(true);
+  }, [load]));
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -158,8 +165,11 @@ export default function WeekScreen() {
         {/* Day grid */}
         <View style={styles.grid}>
           {days.map((day, i) => {
-            const dayNum   = i + 1;
-            const unlocked = isUnlocked(dayNum) && (dayNum === 1 || !!days[i - 1]?.completed_at);
+            const dayNum      = i + 1;
+            const timeOk      = isUnlocked(dayNum);
+            const gateOk      = dayNum === 1 || !!days[i - 1]?.completed_at;
+            const unlocked    = timeOk && gateOk;
+            const isGateLocked = timeOk && !gateOk;
             return (
               <DayCard
                 key={dayNum}
@@ -168,6 +178,7 @@ export default function WeekScreen() {
                 bucketId={bucketId!}
                 isToday={dayNum === currentDay}
                 isUnlocked={unlocked}
+                isGateLocked={isGateLocked}
                 onPress={day && unlocked ? () => setSelectedDay(day) : undefined}
               />
             );

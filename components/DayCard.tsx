@@ -12,10 +12,11 @@ interface Props {
   bucketId: BucketId;
   isToday: boolean;
   isUnlocked: boolean;
+  isGateLocked?: boolean;
   onPress?: () => void;
 }
 
-export function DayCard({ day, dayNumber, bucketId, isToday, isUnlocked, onPress }: Props) {
+export function DayCard({ day, dayNumber, bucketId, isToday, isUnlocked, isGateLocked, onPress }: Props) {
   const accent   = BucketColors[bucketId] ?? Colors.textSecondary;
   const complete = !!day?.completed_at;
   const locked   = !isUnlocked;
@@ -48,7 +49,11 @@ export function DayCard({ day, dayNumber, bucketId, isToday, isUnlocked, onPress
           </Text>
         </>
       ) : (
-        <Text style={styles.pending}>{locked ? 'Unlocks at 6 AM' : 'Generating…'}</Text>
+        <Text style={styles.pending}>
+          {locked
+            ? (isGateLocked ? `Complete Day ${dayNumber - 1} first` : 'Unlocks at 6 AM')
+            : 'Generating…'}
+        </Text>
       )}
     </Pressable>
   );

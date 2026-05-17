@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View, Text, StyleSheet, ActivityIndicator, SafeAreaView,
 } from 'react-native';
@@ -26,18 +27,19 @@ export default function TodayScreen() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setScreenState('loading');
     const w = await loadCurrentWeek();
-    if (!w) { setScreenState('no_week'); return; }
+    if (!w) { if (!silent) setScreenState('no_week'); return; }
     setWeek(w);
 
     const dayNum   = getWeekDay(new Date());
     const unlocked = isUnlocked(dayNum);
-    if (!unlocked) { setScreenState('locked'); return; }
+    if (!unlocked) { if (!silent) setScreenState('locked'); return; }
 
     const isBackup = w.is_backup_active;
     const c = await loadDayContent(w.id, dayNum, isBackup);
     setContent(c);
 
-    // Show reveal card on Monday (day 1) if not already completed
+    if (silent) return; // silent refresh: just update data, don't touch screen state or reveal
+
     const isMonday = dayNum === 1;
     if (isMonday && !c?.completed_at) {
       const revealKey = `reveal_shown_${w.id}`;
@@ -53,6 +55,12 @@ export default function TodayScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const todayMounted = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!todayMounted.current) { todayMounted.current = true; return; }
+    load(true);
+  }, [load]));
 
   const handleRefresh = useCallback(() => load(true), [load]);
 

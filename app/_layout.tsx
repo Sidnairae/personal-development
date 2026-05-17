@@ -15,9 +15,9 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Schedule Mon–Sat only. Sunday is a transition day with no guaranteed content.
-const NOTIF_IDS      = ['nova-mon','nova-tue','nova-wed','nova-thu','nova-fri','nova-sat'];
-const NOTIF_WEEKDAYS = [2, 3, 4, 5, 6, 7]; // 1=Sun … 7=Sat
+// One notification per day, Mon–Sun. weekday: 1=Sun, 2=Mon … 7=Sat
+const NOTIF_IDS      = ['nova-sun','nova-mon','nova-tue','nova-wed','nova-thu','nova-fri','nova-sat'];
+const NOTIF_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
 
 async function scheduleDaily() {
   const { status } = await Notifications.requestPermissionsAsync();
